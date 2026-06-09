@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -30,6 +31,9 @@ func main() {
 	flag.StringVar(&end, "end", today, "End date (YYYY-MM-DD)")
 
 	flag.Parse()
+
+	start = strings.TrimSpace(start)
+	end = strings.TrimSpace(end)
 
 	// time parsing
 	startDate, err := time.Parse(layout, start)
@@ -76,6 +80,8 @@ func main() {
 		for i := 0; i < count; i++ {
 			gitDate := d.Format(time.RFC3339)
 			cmd := exec.Command("git", "commit", "--allow-empty", "-m", message, "--date", gitDate)
+			fmt.Printf("\rLarping a commit for date: %s (%d/%d)\n", gitDate, i+1, count)
+			time.Sleep(100 * time.Millisecond)
 
 			err := cmd.Run()
 			if err != nil {
@@ -89,7 +95,8 @@ func main() {
 	push := exec.Command("git", "push", "origin", "main")
 	err = push.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Failed to push to remote: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to push to remote: %v\n", err)
+		fmt.Fprintln(os.Stderr, "You can undo local commits with 'git reset --hard origin/main'")
 		os.Exit(1)
 	}
 
