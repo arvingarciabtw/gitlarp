@@ -34,32 +34,40 @@ func main() {
 	// time parsing
 	startDate, err := time.Parse(layout, start)
 	if err != nil {
-		log.Fatalf("Invalid start date: %v", err)
+		log.Fatalf("Error: Invalid start date: %v", err)
 	}
 	endDate, err := time.Parse(layout, end)
 	if err != nil {
-		log.Fatalf("Invalid end date: %v", err)
+		log.Fatalf("Error: Invalid end date: %v", err)
 	}
 
 	// input validation
 	if startDate.After(endDate) {
-		fmt.Fprintf(os.Stderr, "Error: invalid date range\n\n")
+		fmt.Fprintf(os.Stderr, "Error: Invalid date range\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 	if startDate.After(time.Now()) || endDate.After(time.Now()) {
-		fmt.Fprintf(os.Stderr, "Error: cannot make commits for future dates\n\n")
+		fmt.Fprintf(os.Stderr, "Error: Cannot make commits for future dates\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 	if count < 1 {
-		fmt.Fprintf(os.Stderr, "Error: count should at least be 1\n\n")
+		fmt.Fprintf(os.Stderr, "Error: Commit count should at least be 1\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 	if count > 50 {
-		fmt.Fprintf(os.Stderr, "Error: max count is only 50\n\n")
+		fmt.Fprintf(os.Stderr, "Error: Commit count is capped at 50\n\n")
 		flag.Usage()
+		os.Exit(1)
+	}
+
+	// check for git
+	checkRepo := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+	err = checkRepo.Run()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error: You are not in a Git repository.")
 		os.Exit(1)
 	}
 
@@ -71,7 +79,7 @@ func main() {
 
 			err := cmd.Run()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: failed to commit for date %s: %v\n", gitDate, err)
+				fmt.Fprintf(os.Stderr, "Error: Failed to commit for date %s: %v\n", gitDate, err)
 				os.Exit(1)
 			}
 		}
@@ -81,7 +89,7 @@ func main() {
 	push := exec.Command("git", "push", "origin", "main")
 	err = push.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to push to remote: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: Failed to push to remote: %v", err)
 		os.Exit(1)
 	}
 
