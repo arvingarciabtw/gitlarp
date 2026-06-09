@@ -10,8 +10,6 @@ import (
 )
 
 func main() {
-	fmt.Println("=== GITLARP ===")
-
 	// time setup
 	layout := "2006-01-02"
 	today := time.Now().Format(layout)
@@ -43,13 +41,24 @@ func main() {
 		log.Fatalf("Invalid end date: %v", err)
 	}
 
+	// input validation
 	if startDate.After(endDate) {
 		fmt.Fprintf(os.Stderr, "Error: invalid date range\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
+	if startDate.After(time.Now()) || endDate.After(time.Now()) {
+		fmt.Fprintf(os.Stderr, "Error: cannot make commits for future dates\n\n")
+		flag.Usage()
+		os.Exit(1)
+	}
 	if count < 1 {
 		fmt.Fprintf(os.Stderr, "Error: count should at least be 1\n\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+	if count > 50 {
+		fmt.Fprintf(os.Stderr, "Error: max count is only 50\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
