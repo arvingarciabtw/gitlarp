@@ -3,84 +3,121 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 )
 
+type Config struct {
+	Message   string
+	Count     int
+	StartDate time.Time
+	EndDate   time.Time
+}
+
 func main() {
-	// time setup
+	config := parse()
+	verify()
+	larp(config)
+	push()
+}
+
+func parse() Config {
 	layout := "2006-01-02"
 	today := time.Now().Format(layout)
 
-	// flags
 	var message string
 	var count int
 	var start string
 	var end string
 
-	flag.StringVar(&message, "m", "larping...", "Commit message")
-	flag.StringVar(&message, "message", "larping...", "Commit message")
-	flag.IntVar(&count, "c", 1, "Commit count")
-	flag.IntVar(&count, "count", 1, "Commit count")
-	flag.StringVar(&start, "s", today, "Start date (YYYY-MM-DD)")
-	flag.StringVar(&start, "start", today, "Start date (YYYY-MM-DD)")
-	flag.StringVar(&end, "e", today, "End date (YYYY-MM-DD)")
-	flag.StringVar(&end, "end", today, "End date (YYYY-MM-DD)")
+	messageDefault := "larping..."
+	countDefault := 1
+	startDefault := today
+	endDefault := today
+
+	flag.StringVar(&message, "m", messageDefault, "Commit message")
+	flag.StringVar(&message, "message", messageDefault, "Commit message")
+	flag.IntVar(&count, "c", countDefault, "Commit count")
+	flag.IntVar(&count, "count", countDefault, "Commit count")
+	flag.StringVar(&start, "s", startDefault, "Start date (YYYY-MM-DD)")
+	flag.StringVar(&start, "start", startDefault, "Start date (YYYY-MM-DD)")
+	flag.StringVar(&end, "e", endDefault, "End date (YYYY-MM-DD)")
+	flag.StringVar(&end, "end", endDefault, "End date (YYYY-MM-DD)")
 
 	flag.Parse()
 
-	start = strings.TrimSpace(start)
-	end = strings.TrimSpace(end)
+	start, end = trimDates(start, end)
+	startDate, endDate := parseDates(start, end, layout)
+	validate(startDate, endDate, count)
 
-	// time parsing
+	return Config{
+		Message:   message,
+		Count:     count,
+		StartDate: startDate,
+		EndDate:   endDate,
+	}
+}
+
+func trimDates(start string, end string) (string, string) {
+	return strings.TrimSpace(start), strings.TrimSpace(end)
+}
+
+func parseDates(start string, end string, layout string) (time.Time, time.Time) {
 	startDate, err := time.Parse(layout, start)
 	if err != nil {
-		log.Fatalf("Error: Invalid start date: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: Invalid start date. Format for dates are in YYYY-MM-DD.\n\n")
+		flag.Usage()
+		os.Exit(1)
 	}
 	endDate, err := time.Parse(layout, end)
 	if err != nil {
-		log.Fatalf("Error: Invalid end date: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: Invalid end date. Format for dates are in YYYY-MM-DD.\n\n")
+		flag.Usage()
+		os.Exit(1)
 	}
+	return startDate, endDate
+}
 
-	// input validation
+func validate(startDate time.Time, endDate time.Time, count int) {
 	if startDate.After(endDate) {
-		fmt.Fprintf(os.Stderr, "Error: Invalid date range\n\n")
+		fmt.Fprintf(os.Stderr, "Error: Invalid date range.\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 	if startDate.After(time.Now()) || endDate.After(time.Now()) {
-		fmt.Fprintf(os.Stderr, "Error: Cannot make commits for future dates\n\n")
+		fmt.Fprintf(os.Stderr, "Error: Cannot make commits for future dates.\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 	if count < 1 {
-		fmt.Fprintf(os.Stderr, "Error: Commit count should at least be 1\n\n")
+		fmt.Fprintf(os.Stderr, "Error: Commit count should at least be 1.\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 	if count > 50 {
-		fmt.Fprintf(os.Stderr, "Error: Commit count is capped at 50\n\n")
+		fmt.Fprintf(os.Stderr, "Error: Commit count is capped at 50.\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
+}
 
-	// check for git
+func verify() {
 	checkRepo := exec.Command("git", "rev-parse", "--is-inside-work-tree")
-	err = checkRepo.Run()
+	err := checkRepo.Run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: You are not in a Git repository.")
 		os.Exit(1)
 	}
+}
 
-	// commits for each date
-	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
-		for i := 0; i < count; i++ {
+func larp(cfg Config) {
+	for d := cfg.StartDate; !d.After(cfg.EndDate); d = d.AddDate(0, 0, 1) {
+		for i := 0; i < cfg.Count; i++ {
 			gitDate := d.Format(time.RFC3339)
-			cmd := exec.Command("git", "commit", "--allow-empty", "-m", message, "--date", gitDate)
-			fmt.Printf("\rLarping a commit for date: %s (%d/%d)\n", gitDate, i+1, count)
+			cmd := exec.Command("git", "commit", "--allow-empty", "-m", cfg.Message, "--date", gitDate)
+			fmt.Printf("\rLarping a commit for date: %s (%d/%d)\n", gitDate, i+1, cfg.Count)
 			time.Sleep(100 * time.Millisecond)
 
 			err := cmd.Run()
@@ -90,10 +127,11 @@ func main() {
 			}
 		}
 	}
+}
 
-	// push to remote
+func push() {
 	push := exec.Command("git", "push", "origin", "main")
-	err = push.Run()
+	err := push.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Failed to push to remote: %v\n", err)
 		fmt.Fprintln(os.Stderr, "You can undo local commits with 'git reset --hard origin/main'")
